@@ -17,7 +17,7 @@ Ark 自体にはデータベースにアクセスする機能はありません�
     $ cpanm DBIx::Class SQL::Translator
 
 さて、今、あなたのアプリケーションで使う2つのCPANモジュールを新たにインストールしました。こういう時は、
-Makefile.PL に依存モジュールの記述を以下のように追加しておきましょう。
+cpanfile に依存モジュールの記述を以下のように追加しておきましょう。
 
     requires 'DBIx::Class';
     requires 'SQL::Translator';
@@ -27,11 +27,21 @@ Makefile.PL に依存モジュールの記述を以下のように追加して�
 別の環境(それは本番環境かもしれません!)にアプリケーションをセットアップする際にまたCPANモジュールを全て入れる必要があります。
 CPANモジュールのインストール漏れがあったら大変です。
 
-しかし、心配することはありません。Makefile.PL にきちんと依存モジュールを記載しておけば、以下のコマンド一発で魔法のように
+Carton
+------------
+
+しかし、心配することはありません。cpanfile にきちんと依存モジュールを記載しておけば、`carton install` で魔法のように
 全てのCPANモジュールをインストールしてくれます。
 
-    $ cpanm --installdeps .
+    $ cpanm Carton
+    $ carton install
 
+`Carton` とは
+
+    Carton - Perl module dependency manager (aka Bundler for Perl)
+
+とあるようにPerlのモジュールの依存関係を管理するツールで､
+Rubyを使っている人には馴染みのある[Bundler](http://bundler.io/) にインスパイアされて開発されています
 
 Why DBIx::Class ?
 -----------------
@@ -67,18 +77,10 @@ Why DBIx::Class ?
 それに、今後ORMを乗り換えたとしても(遠くない将来そうなるでしょう)、DBIx::Classの流儀を
 知っておくことは損ではありません。
 
-DBIx::Class は本当に何でもできます。余計に思える機能もたくさんあります。  
-「こんなこともできてしまうのか」と驚かされることもあります。  
+DBIx::Class は本当に何でもできます。余計に思える機能もたくさんあります。
+「こんなこともできてしまうのか」と驚かされることもあります。
 多機能という点ではピークとも言えるでしょう。
 それは今後、新しいORMが作られる中でも使っていく上でも、ベンチマークとなることは間違いありません。
-
-2011年現在、DBIx::Classの有力な代替候補はDBIx::Skinnyですが、元々は
-DBIx::Classのヘビーユーザーだった作者がDBIx::Classに嫌気がさして作り始めた背景があるようです。
-良くも悪くも DBIx::Class を受け継いでいる部分があります。
-
-また、DBIx::Skinny の後継として、Teng というORMの開発が進んでいるので、今にDBIx::Class から
-DBIx::Skinny に乗り換えるよりかは、もう少し様子を見てTengに乗り換えてるのも良いのではないでしょうか。
-
 
 リレーションモデル
 ---------------
@@ -113,18 +115,18 @@ Jobeet のための `Jobeet::Schema` を作成しましょう。
 `lib/Jobeet/Schema.pm` を作成し、以下のように編集してみましょう。
 
     package Jobeet::Schema;
-    use v5.16.0;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'DBIx::Class::Schema';
     use DateTime;
-    
+
     __PACKAGE__->load_namespaces;
-    
-    sub {state $TZ = DateTime::TimeZone->new(name => 'Asia/Tokyo')}
-    sub now   {DateTime->now(time_zone => shift->TZ, locale => 'ja')}
+
+    sub TZ {state $TZ = DateTime::TimeZone->new(name => 'Asia/Tokyo')}
+    sub now {DateTime->now(time_zone => shift->TZ, locale => 'ja')}
     sub today {shift->now->truncate(to => 'day')}
-    
+
     1;
 
 日付処理用のメソッドも幾つか作成しておきます。明日、ここにバージョニングサポートのコードを付け加えますが、とりあえずこのまま話を進めましょう。
@@ -157,28 +159,30 @@ Perl のクラスのファイル名はほとんどの場合パッケージ名か
 `DBIx::Class` の Result クラスは、`DBIx::Class` を継承して作成し、
 
     package Jobeet::Schema::Result::Job;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'DBIx::Class';
-    
+
     __PACKAGE__->load_components(qw/Core/);
-    
+
     # ここにテーブル定義
-    
+
     1;
 
 のような構成になります。Result クラスとして動作するために最低限この `Core` コンポーネントはロードする必要があります。
 他にもさまざまなコンポーネントがありますが、ここではこれに加えて `InflateColumn::DateTime` コンポーネントもロードするようにしてみましょう。
 
     package Jobeet::Schema::Result::Job;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'DBIx::Class';
-    
+
     __PACKAGE__->load_components(qw/InflateColumn::DateTime Core/);
-    
+
     # ここにテーブル定義
-    
+
     1;
 
 この `InflateColumn::DateTime` コンポーネントは date 型や datetime 型のデータを取得時に自動で Perl の DateTime オブジェクトに変換してくれたり、逆に DateTime オブジェクトをそのままデータベースに insert することを可能にしてくれるコンポーネントです。
@@ -186,23 +190,25 @@ Perl のクラスのファイル名はほとんどの場合パッケージ名か
 これをすべての Result クラスそれぞれに書くのは面倒ですし無駄です。また `DBIx::Class` はこのように定義が重複するとパフォーマンスが悪くなります。こういう場合は共通のベースクラスを作成し、定義を一元化させるのが `DBIx::Class` をつかう上での重要なベストプラクティスとなっています。 そこでこれら共通の処理をまとめ `Jobeet::Schema::ResultBase` としてベースクラスを定義してみましょう。
 
     package Jobeet::Schema::ResultBase;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'DBIx::Class';
-    
+
     __PACKAGE__->load_components(qw/InflateColumn::DateTime Core/);
-    
+
     1;
 
 そしてこれを使用してさきほどの Job クラスを書き換えると
 
     package Jobeet::Schema::Result::Job;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'Jobeet::Schema::ResultBase';
-    
+
     # ここにテーブル定義
-    
+
     1;
 
 こうなります。シンプルになりましたね。
@@ -300,9 +306,9 @@ Perl のクラスのファイル名はほとんどの場合パッケージ名か
     use strict;
     use warnings;
     use parent 'Jobeet::Schema::ResultBase';
-    
+
     __PACKAGE__->table('jobeet_job');
-    
+
     __PACKAGE__->add_columns(
         id => {
             data_type         => 'INTEGER',
@@ -378,21 +384,22 @@ Perl のクラスのファイル名はほとんどの場合パッケージ名か
             timezone    => Jobeet::Schema->TZ,
         },
     );
-    
+
     __PACKAGE__->set_primary_key('id');
     __PACKAGE__->add_unique_constraint(['token']);
-    
+
     1;
 
 同様に他のテーブルクラスを定義していきましょう。 Categoryクラス：
 
     package Jobeet::Schema::Result::Category;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'Jobeet::Schema::ResultBase';
-    
+
     __PACKAGE__->table('jobeet_category');
-    
+
     __PACKAGE__->add_columns(
         id => {
             data_type         => 'INTEGER',
@@ -408,21 +415,22 @@ Perl のクラスのファイル名はほとんどの場合パッケージ名か
             is_nullable => 0,
         },
     );
-    
+
     __PACKAGE__->set_primary_key('id');
     __PACKAGE__->add_unique_constraint(['name']);
-    
+
     1;
 
 CategoryAffiliate クラス：
 
     package Jobeet::Schema::Result::CategoryAffiliate;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'Jobeet::Schema::ResultBase';
-    
+
     __PACKAGE__->table('jobeet_category_affiliate');
-    
+
     __PACKAGE__->add_columns(
         category_id => {
             data_type   => 'INTEGER',
@@ -439,20 +447,21 @@ CategoryAffiliate クラス：
             },
         },
     );
-    
+
     __PACKAGE__->set_primary_key(qw/category_id affiliate_id/);
-    
+
     1;
 
 Affiliate クラス:
 
     package Jobeet::Schema::Result::Affiliate;
+    use v5.18.4;
     use strict;
     use warnings;
     use parent 'Jobeet::Schema::ResultBase';
-    
+
     __PACKAGE__->table('jobeet_affiliate');
-    
+
     __PACKAGE__->add_columns(
         id => {
             data_type         => 'INTEGER',
@@ -488,10 +497,10 @@ Affiliate クラス:
             timezone    => Jobeet::Schema->TZ,
         },
     );
-    
+
     __PACKAGE__->set_primary_key('id');
     __PACKAGE__->add_unique_constraint(['email']);
-    
+
     1;
 
 これですべてのテーブルのカラム定義が完了しました。慣れていないと面倒に感じるかもしれません。
@@ -501,9 +510,10 @@ Affiliate クラス:
 
 
     package Jobeet::Schema::Types;
+    use v5.18.4;
     use parent 'Exporter';
     our @EXPORT = qw/PK_INTEGER INTEGER VARCHAR TINYINT DATETIME/;
-    
+
     sub PK_INTEGER {
         +{
             data_type         => 'INTEGER',
@@ -515,7 +525,7 @@ Affiliate クラス:
             @_,
         };
     }
-    
+
     sub INTEGER {
         +{
             data_type         => 'INTEGER',
@@ -526,7 +536,7 @@ Affiliate クラス:
             @_,
         };
     }
-    
+
     sub TINYINT {
         +{
             data_type         => 'TINYINT',
@@ -538,7 +548,7 @@ Affiliate クラス:
             @_,
         };
     }
-    
+
     sub VARCHAR {
         +{
             data_type   => 'VARCHAR',
@@ -547,7 +557,7 @@ Affiliate クラス:
             @_,
         },
     }
-    
+
     sub DATETIME {
         +{
             data_type   => 'DATETIME',
@@ -558,14 +568,16 @@ Affiliate クラス:
     }
     1;
 
+このように定義し`use Jobeet::Schema::Types` して使う事で､こんな風にすっきり書くことができます。
+
     package Jobeet::Schema::Result::Affiliate;
     use strict;
     use warnings;
     use parent 'Jobeet::Schema::ResultBase';
     use Jobeet::Schema::Types;
-    
+
     __PACKAGE__->table('jobeet_affiliate');
-    
+
     __PACKAGE__->add_columns(
         id          => PK_INTEGER,
         url         => VARCHAR,
@@ -576,14 +588,11 @@ Affiliate クラス:
         is_active   => TINYINT,
         created_at  => DATETIME,
     );
-    
+
     __PACKAGE__->set_primary_key('id');
     __PACKAGE__->add_unique_constraint(['email']);
-    
+
     1;
-
-こんな風にすっきり書くことができます。
-
 
 さて、カラム定義は完了しましたが足りない物があります。そうです、リレーションの定義です。最初のリレーションモデルの図を思い出してください。
 
@@ -684,21 +693,21 @@ Result クラスのベースクラス（`Jobeet::Schema::ResultBase`）にその
 
     sub insert {
         my $self = shift;
-    
+
         my $now = Jobeet::Schema->now;
         $self->created_at( $now ) if $self->can('created_at');
         $self->updated_at( $now ) if $self->can('updated_at');
-    
+
         $self->next::method(@_);
     }
-    
+
     sub update {
         my $self = shift;
-    
+
         if ($self->can('updated_at')) {
             $self->updated_at( Jobeet::Schema->now );
         }
-    
+
         $self->next::method(@_);
     }
 
@@ -714,7 +723,7 @@ INSERT 時には `created_at` と `update_at` を更新し、UPDATE 時には `u
 上記のDATETIME型で使われていますが、DBIx::ClassにはInflateという仕組みがあります。
 DBのデータを、オブジェクトとして直接操作できるようにするというものです。
 
-例えば、DBのカラムにJSON文字列を入れて、それを直接データ構造として扱いたい場合は以下のようになります。  
+例えば、DBのカラムにJSON文字列を入れて、それを直接データ構造として扱いたい場合は以下のようになります。
 (DBのカラムにJSONを入れるのはどうなのかという話はおいておきます。)
 
     use JSON qw/to_json from_json/;
@@ -731,9 +740,9 @@ DBのデータを、オブジェクトとして直接操作できるようにす
 
     package Jobeet::Schema::ResultBase;
     ...
-    
+
     use JSON qw/to_json from_json/;
-    
+
     sub inflate_json_column {
         my $pkg = shift;
         my @columns = @_;
@@ -760,82 +769,166 @@ ORM からデータベースにアクセスする
 
 Ark からこのモデルを使用するのは明日にして、今日はこのクラスのみを少し使ってみましょう。
 
-以下のようなスクリプトを deploy.pl としてアプリケーションディレクトリに作ってみましょう。
+その前に必要なモジュールをインストールするため`cpanfile`に以下を追記しましょう｡
 
+    requires 'GitDDL'
+    requires 'Path::Class
+
+追加できたら`carton install`でモジュールのインストールを行ってください｡
+
+それでは､以下のようなスクリプトを create_ddl.pl としてアプリケーションディレクトリに作ってみましょう。
+
+    use v5.18.4;
     use strict;
     use warnings;
-    use lib 'lib';
-    
+    use utf8;
+
     use Jobeet::Schema;
-    
-    my $schema = Jobeet::Schema->connect('dbi:SQLite:./test.db');
-    $schema->deploy;
+    use SQL::Translator;
+    use DBIx::Class::Optional::Dependencies;
+    use Path::Class;
+
+    my $schema   = Jobeet::Schema->connect('dbi:SQLite:./test.db');
+    my $sql_file = './schema.sql';
+    my $file     = Path::Class::file($sql_file);
+
+    my $output = $schema->deployment_statements(
+        undef, undef, undef, {
+            no_comments    => 1,
+            add_drop_table => 1,
+        }
+    );
+
+    $file->parent->mkpath;
+    $file->spew( iomode => '>:encoding(UTF-8)', $output );
+
 
 そしてこれを実行してみてください。
 
-    $ perl deploy.pl
+    $ carton exec perl create_ddl.pl
 
-これはなにも出力されず終わるかもしれません。しかし同じディレクトリに test.db と言うファイルが出来ていませんか？ このスクリプトは test.db という SQLite データベースを作成します。そしてそれは今日定義したテーブル定義も含まれます！
+これはなにも出力されず終わるかもしれません。しかし同じディレクトリに test.db と言うファイルが出来ていませんか？ このスクリプトは test.db という SQLite データベースを作成します。
 
-DBIx::Class は `DBIC_TRACE` と言う環境変数でどのような SQL が実行されているか確認することが出来ます。
-いちど今作成した test.db を削除し、この環境変数とともにもう一度スクリプトを走らせてみましょう。
+更に schema.sql というファイルが出来ていると思います｡
 
-    $ rm test.db
-    $ DBIC_TRACE=1 perl deploy.pl
+これは今日定義したテーブルをSQLに出力したものになります｡
 
-うまくいっていればこのような出力がされるはずです：
+うまくいっていれば`schema.sql`はこのように出力がされているはずです：
+
+    BEGIN TRANSACTION;
+
+    DROP TABLE IF EXISTS jobeet_affiliate;
 
     CREATE TABLE jobeet_affiliate (
-      id INTEGER PRIMARY KEY NOT NULL,
-      url VARCHAR(255) NOT NULL,
-      email VARCHAR(255) NOT NULL,
-      token VARCHAR(255) NOT NULL,
-      is_active TINYINT NOT NULL DEFAULT '0',
-      created_at DATETIME NOT NULL
-    ): 
-    
-    CREATE UNIQUE INDEX jobeet_affiliate_email ON jobeet_affiliate (email): 
-    
-    CREATE TABLE jobeet_category (
-      id INTEGER PRIMARY KEY NOT NULL,
-      name VARCHAR(255) NOT NULL
-    ): 
-    
-    CREATE UNIQUE INDEX jobeet_category_name ON jobeet_category (name): 
-    
-    CREATE TABLE jobeet_job (
-      id INTEGER PRIMARY KEY NOT NULL,
-      category_id INTEGER NOT NULL,
-      type VARCHAR(255),
-      position VARCHAR(255) NOT NULL,
-      location VARCHAR(255) NOT NULL,
-      description TEXT NOT NULL,
-      how_to_apply TEXT NOT NULL,
-      token VARCHAR(255) NOT NULL,
-      is_public TINYINT NOT NULL DEFAULT '1',
-      is_activated TINYINT NOT NULL DEFAULT '0',
-      email VARCHAR(255) NOT NULL,
-      expires_at DATETIME NOT NULL,
-      created_at DATETIME NOT NULL,
-      updated_at DATETIME NOT NULL
-    ): 
-    
-    CREATE INDEX jobeet_job_idx_category_id ON jobeet_job (category_id): 
-    
-    CREATE UNIQUE INDEX jobeet_job_token ON jobeet_job (token): 
-    
-    CREATE TABLE jobeet_category_affiliate (
-      category_id INTEGER NOT NULL,
-      affiliate_id INTEGER NOT NULL,
-      PRIMARY KEY (category_id, affiliate_id)
-    ): 
-    
-    CREATE INDEX jobeet_category_affiliate_idx_affiliate_id ON jobeet_category_affiliate (affiliate_id): 
-    
-    CREATE INDEX jobeet_category_affiliate_idx_category_id ON jobeet_category_affiliate (category_id): 
+        id INTEGER PRIMARY KEY NOT NULL,
+        url VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        token VARCHAR(80) NOT NULL,
+        is_active TINYINT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL
+    );
 
-`DBIx::Class` ではこのように SQL を自動的に生成します。
-このためにたった1種類のデータベース定義だけで MySQL、SQLite、PostgreSQL、Oracle、DB2、MSSQL などのさまざまなデータベースを作成・利用することが出来ます。
+    CREATE UNIQUE INDEX jobeet_affiliate_email ON jobeet_affiliate (email);
+
+    DROP TABLE IF EXISTS jobeet_category;
+
+    CREATE TABLE jobeet_category (
+        id INTEGER PRIMARY KEY NOT NULL,
+        name VARCHAR(255) NOT NULL
+    );
+
+    CREATE UNIQUE INDEX jobeet_category_name ON jobeet_category (name);
+
+    DROP TABLE IF EXISTS jobeet_job;
+
+    CREATE TABLE jobeet_job (
+        id INTEGER PRIMARY KEY NOT NULL,
+        category_id INTEGER NOT NULL,
+        type VARCHAR(255),
+        position VARCHAR(255) NOT NULL,
+        location VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        how_to_apply TEXT NOT NULL,
+        token VARCHAR(255) NOT NULL,
+        is_public TINYINT NOT NULL DEFAULT 1,
+        is_activated TINYINT NOT NULL DEFAULT 0,
+        email VARCHAR(255) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        FOREIGN KEY (category_id) REFERENCES jobeet_category(id) ON UPDATE CASCADE
+    );
+
+    CREATE INDEX jobeet_job_idx_category_id ON jobeet_job (category_id);
+
+    CREATE UNIQUE INDEX jobeet_job_token ON jobeet_job (token);
+
+    DROP TABLE IF EXISTS jobeet_category_affiliate;
+
+    CREATE TABLE jobeet_category_affiliate (
+        category_id INTEGER NOT NULL,
+        affiliate_id INTEGER NOT NULL,
+        PRIMARY KEY (category_id, affiliate_id),
+        FOREIGN KEY (affiliate_id) REFERENCES jobeet_affiliate(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        FOREIGN KEY (category_id) REFERENCES jobeet_category(id) ON DELETE CASCADE ON UPDATE CASCADE
+    );
+
+    CREATE INDEX jobeet_category_affiliate_idx_affiliate_id ON jobeet_category_affiliate (affiliate_id);
+
+    CREATE INDEX jobeet_category_affiliate_idx_category_id ON jobeet_category_affiliate (category_id);
+
+    COMMIT;
+
+このSQLをcommit
+ではこのsqlを作成した `test.db` に反映してみましょう｡
+
+では､以下のようなスクリプトを migrate.pl としてアプリケーションディレクトリに作りましょう｡
+
+    use v5.18.4;
+    use strict;
+    use warnings;
+    use utf8;
+
+    use GitDDL;
+
+    my $gd = GitDDL->new(
+        work_tree => './',
+        ddl_file  => './schema.sql',
+        dsn       => ['dbi:SQLite:./test.db'],
+    );
+
+    my $db_version = '';
+    eval {
+        open my $fh, '>', \my $stderr;
+        local *STDERR = $fh;
+        $db_version   = $gd->database_version;
+    };
+
+    if (!$db_version) {
+        $gd->deploy;
+        say 'done migrate';
+        exit;
+    }
+
+    if ($gd->check_version) {
+        say 'Database is already latest';
+    }
+    else {
+        print $gd->diff . "\n";
+        $gd->upgrade_database;
+        say 'done migrate';
+    }
+
+
+このような事をしなくても`DBIx::Class`だけで SQL の反映が行えますが､
+複数人で開発する場合や､ ある機能を並行して別branchで開発するときなどに `GitDDL`は非常に有効です｡
+また､実際にデータベースに反映されるSQLを確認する事が確認できるのも大きな利点といえるでしょう｡
+
+GitDDLについては以下の記事が参考になるかと思います
+
+[#5「GitDDLまじイノベーティブ」 tech.kayac.com Advent Calendar 2012](http://tech.kayac.com/archive/5gitddl_techkayaccom_advent_calendar_2012.html)
+
+ちなみに､`DBIx::Class`は1種類のデータベース定義だけで MySQL、SQLite、PostgreSQL、Oracle、DB2、MSSQL などのさまざまなデータベースを作成・利用することが出来ます。
 
 SQLite以外のデータベース環境が利用できる人は先ほどのスクリプトの connect 先を変更してもうまく動くか確かめてみてください。たとえば MySQL なら
 
@@ -852,9 +945,9 @@ SQLite以外のデータベース環境が利用できる人は先ほどのス�
     use strict;
     use warnings;
     use lib 'lib';
-    
+
     use Jobeet::Schema;
-    
+
     my $schema = Jobeet::Schema->connect('dbi:SQLite:./test.db');
 
 このコードは指定されたデータベースに接続し、その Schema オブジェクトを取得しています。
