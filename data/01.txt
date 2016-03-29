@@ -82,11 +82,11 @@ SQLite もしくは MySQL が使える環境であることを確認してくだ
     $ echo 'eval "$(plenv init -)"' >> ~/.bash_profile
     $ exec $SHELL -l
     $ git clone https://github.com/tokuhirom/Perl-Build.git ~/.plenv/plugins/perl-build/
-    $ plenv install 5.18.4
+    $ plenv install 5.20.3
     $ plenv rehash
     $ plenv install-cpanm
 
-これで、Perl5.18.4の開発環境が整いました。cpanmというコマンドも使えるようになっているはずです。
+これで、Perl5.20.3の開発環境が整いました。cpanmというコマンドも使えるようになっているはずです。
 
 perlのバージョニングについての話は以下のエントリーをがよくまとまっているのでそちらもご覧下さい｡
 
