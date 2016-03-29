@@ -61,7 +61,7 @@ Ark を使わない手はありません。
 
 Ark は Perl のフレームワークなので当然 Perl がインストールされた環境が必要です。
 Ark の開発・実行には Perl 5.8.1 以上が必要です。
-最近は perlbrew で気軽に Perl をコンパイル可能なので新しいバージョンをガンガン使って行きましょう。
+最近は plenv で気軽に Perl をコンパイル可能なので新しいバージョンをガンガン使って行きましょう。
 
 Windowsな環境をご利用の場合は、Cygwin や (?:Active|Strawberry)Perl で頑張るよりも VMware で
 Linux 仮想マシンを構築するほうが結果的に労力が少なく済むと思います。
@@ -71,26 +71,26 @@ SQLite もしくは MySQL が使える環境であることを確認してくだ
 
 ### Perl 開発環境の構築
 
-近年は、システム標準のPerlをそのまま使うのではなく、perlbrewとcpanmを組み合わせて、開発環境を構築するのが主流となっています。
+近年は、システム標準のPerlをそのまま使うのではなく、[plenv](https://github.com/tokuhirom/plenv)/[Perl-Build](https://github.com/tokuhirom/Perl-Build)とcpanmを組み合わせて、開発環境を構築するのが主流となっています。
 
 システムを壊すことなく、任意のPerlのバージョンを利用でき、一般ユーザー権限で手軽にPerlの実行環境を整えられるのが大きなメリットです。
 
 以下のコマンドを打てば、環境構築が可能です。シェルの種類やPerlのバージョン等はリリースにあわせて適宜書き換えてください。
 
-    $ curl -kL http://install.perlbrew.pl | bash
-    $ perlbrew install perl-5.16.2 --as 5.16.2
-    $ perlbrew switch 5.16.2
-    $ perlbrew install-cpanm
-    $ cpanm --self-upgrade
+    $ git clone https://github.com/tokuhirom/plenv.git ~/.plenv
+    $ echo 'export PATH="$HOME/.plenv/bin:$PATH"' >> ~/.bash_profile
+    $ echo 'eval "$(plenv init -)"' >> ~/.bash_profile
+    $ exec $SHELL -l
+    $ git clone https://github.com/tokuhirom/Perl-Build.git ~/.plenv/plugins/perl-build/
+    $ plenv install 5.20.3
+    $ plenv rehash
+    $ plenv install-cpanm
 
-これで、Perl5.16.2の開発環境が整いました。cpanmというコマンドも使えるようになっているはずです。
+これで、Perl5.20.3の開発環境が整いました。cpanmというコマンドも使えるようになっているはずです。
 
-perlbrewによる環境構築方法は随時アップデートされています。最新の情報は[本家のサイト](http://perlbrew.pl/)を参照下さい。
+perlのバージョニングについての話は以下のエントリーをがよくまとまっているのでそちらもご覧下さい｡
 
-少し古い内容もありますが tokuhirom 氏による以下のエントリーをがよくまとまっているのでそちらも参照してください。
-
-[モダンな Perl  の開発環境の構築方法](http://d.hatena.ne.jp/tokuhirom/20100716/perlenv)
-
+[Q. Perl5 のどのバージョンをつかったらいいのですか?](http://blog.64p.org/entry/2013/06/10/134208)
 
 ### cpanm の設定
 
@@ -103,49 +103,14 @@ Perl の開発を効率的に行うためにはこの CPAN モジュールを有
 CPAN モジュールは `cpanm` コマンドを使用してインストールすることが出来ます。
 
 cpanm は CPAN レポジトリからだけではなく、tarball や URL を指定したモジュールインストールも可
-能になっています。実のところ、Ark は CPAN リポジトリにあがっていません。
-
+能になっています。
 
 Ark のインストール
 ---------------
 
 cpanm コマンドの設定が完了したら Ark をインストールしましょう。
 
-前述したとおり、Ark は CPAN に上がっていませんが、github にリポジトリがあるので、そこからインストールができます。
-
-Ark は Catalyst ライクなルーティングを提供するルーティングライブラリ、Path::AttrRouter に依存していますが、
-こちらも CPAN に上がっておりません。
-
-また、Ark も Path::AttrRouter も Module::Install を使って、Makeifle.PL が作成されていますが、github のリポジトリ
-には inc/ 以下が同梱されておりません。よって、Module::Install と幾つかの付随パッケージをインストールする必要があります。
-
-よって、以下の順でインストールする必要があります。
-
-1. Module::Install::*
-2. Path::AttrRouter
-3. Ark
-
-すこし煩わしく感じるかもしれませんが、cpanm を使えば簡単にインストールできるので心配しないでください。
-
-### インストール
-
-    $ cpanm Module::Install::TestBase Module::Install::Repository Module::Install::AuthorTests
-    $ cpanm https://github.com/typester/Path-AttrRouter/tarball/master
-    $ cpanm https://github.com/typester/ark-perl/tarball/master
-
-URL 指定だとうまくいかない場合、cpanmで使っているバックエンドモジュールがSSLに対応していないのかもしれません。
-先にLWP::Protocol::httpsを入れてみて下さい。
-
-    $ cpanm LWP::Protocol::https
-
-それでも上手くいかない場合は wget 等で tarball をダウンロードしてきて、cpanm の
-引数に指定してください。
-
-    $ cpanm Ark.tar.gz
-
-また、github で使われている SSL証明書の検出に失敗して、ダウンロードがうまくいかないことがあるかもしれません。
-その場合は決して、--no-check-certificateオプション等を使ったりせず、証明書を追加するようにしましょう。
-
+    $ cpanm Ark
 
 Module::Setup のインストール
 ----------------------------
@@ -163,7 +128,7 @@ Module::Setupは標準でModule::Setup::Flavor以下にFlavor(スケルトン)�
 
 ゆくゆくは自分好みのFlavorを使うと良いと思いますが、今回は以下のFlavorを使うことにしましょう。
 
-    $ cpanm https://github.com/Songmu/p5-Module-Setup-Flavor-ArkDBIC/tarball/master
+    $ cpanm https://github.com/Konboi/p5-Module-Setup-Flavor-ArkDBIC/archive/master.tar.gz
 
 ### module-setupのセットアップ
 
@@ -178,16 +143,16 @@ Module::Setup の使い方に関しては以下を参照してみてください
 
 [Module::Setup でらくらくモジュール作成](http://perl-users.jp/articles/advent-calendar/2009/hacker/19.html)
 
-
 アプリケーションの作成
 ------------------
 
 それではアプリケーションを作成してみましょう。
 
     $ module-setup Jobeet
+    [1]: default
+    [2]: ark
 
-`Jobeet` ディレクトリが作成され、その中にアプリケーションのスケルトンが作成されます。
-
+と表示されるので`ark`を選択しましょう｡ `Jobeet` ディレクトリが作成され、その中にアプリケーションのスケルトンが作成されます。
 
 アプリケーションディレクトリの構成
 -----------------------------
@@ -201,16 +166,16 @@ Module::Setup の使い方に関しては以下を参照してみてください
 
 ファイルの役割は以下のようになります。
 
- * Makefile.PL - Makefileを作成するスクリプト、依存モジュールの定義などを行う
+ * cpanfile - 依存モジュールの定義などを行います｡ rubyのGemfileのような存在です
  * lib/Jobeet.pm - アプリケーションメインクラス
  * lib/Jobeet/Controller.pm - ルートコントローラクラス
-
 
 スケルトンアプリケーションの起動
 ---------------------------
 
 Ark は Plack に対応しているので、以下のコマンドで簡単にスケルトンアプリケーションを起動できます。
 
+    $ cpanm Plack
     $ plackup -r dev.psgi
     Watching ./lib dev.psgi for file updates.
     [debug] Loaded Path actions:
@@ -220,7 +185,7 @@ Ark は Plack に対応しているので、以下のコマンドで簡単にス
     | /                                   | /index                               |
     | /                                   | /default                             |
     '-------------------------------------+--------------------------------------'
-    
+
     [debug] Setup finished
     HTTP::Server::PSGI: Accepting connections at http://0:5000/
 
@@ -239,17 +204,6 @@ plackup の -E オプション(標準はdevelopment)により表示を変更で�
 
 -r オプションをつけておくと、 lib/ 以下や、.psgi 変更を検知してサーバーを再起動してくれます。開発中はつけておくと良いでしょう。
 
-ただし、以下のXSモジュールをいれておかないと、CPUをかなり消費してしまうので、インストールしておきましょう。  
-(Mac OS X Lion 以降の場合逆効果という報告もあるので入れないほうが良いかもしれません)
-
-linux の場合
-
-    $ cpanm Linux::Inotify2
-
-mac の場合
-
-    $ cpanm Mac::FSEvents
-
 ちなみに、 -L Shotgun というオプションもあるのですが、これはリクエストの度にサーバープロセスを再起動するので、動きが重くおすすめしません。
 
 
@@ -259,4 +213,3 @@ mac の場合
 はい、今日はここまでです。まだ Perl コードを一行も書いていませんが、Ark の開発環境をセットアップし、アプリケーションのスケルトンを作成することができました。
 
 明日は、アプリケーションが何を行うのかを明らかにしチュートリアルの間に実装する必要のある要件を話します。
-

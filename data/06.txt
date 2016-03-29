@@ -8,7 +8,7 @@ URL
 ------
 
 Jobeet ホームページ上の求人情報をクリックすると、URLは /job/1 のように表示されます。
-もし PHP で Web サイトの開発をしたことがあるなら、おそらく /job.php?id=1 というURLを見慣れているでしょう。 
+もし PHP で Web サイトの開発をしたことがあるなら、おそらく /job.php?id=1 というURLを見慣れているでしょう。
 Ark はどうやって動作しているのでしょうか？
  Ark はどうやってこのURLを基本とするアクションを決めているのでしょうか？
 なぜ求人の id は `my ($self, $c, $id) = @_;` で取得できるのでしょうか？
@@ -292,7 +292,7 @@ RootコントローラじゃないendからRoot#endを呼び出したい場合�
     sub index :Path {
         # Pathが空(=indexページ)の処理
     }
-    
+
     sub default :Path :Args {
         # 標準の挙動(マッチするアクションが他になかった場合)の処理
     }
@@ -301,7 +301,7 @@ RootコントローラじゃないendからRoot#endを呼び出したい場合�
 
 あるアクションの中で他のアクションを呼び出したい場合に、`$c->forward('something');`とすれば、その処理を呼び出すことが可能です。
 
-実際のところ、これは`$self->something($c);`と同じ動きになりますが、`$c->forward('/other/something');`などとして、他のコントローラのメソッドも呼び出す事もできるのが違いです。 
+実際のところ、これは`$self->something($c);`と同じ動きになりますが、`$c->forward('/other/something');`などとして、他のコントローラのメソッドも呼び出す事もできるのが違いです。
 また、forwardで呼び出した場合、アクションの流れと処理時間がデバッグコンソールに表示されるので便利です。
 
 forwardはそのアクションが呼び出された後も、残りの処理が実行されますが、別のアクションを呼び出してそこで残りの処理を続行させたくない場合はdetachを使います。
@@ -322,33 +322,32 @@ Rootコントローラー
 
 それでは実際にJobeetのコントローラーを書いていきましょう。実はプロジェクトをつくった時点で、トップページと404のアクションはすでに定義されています。
 
-lib/Jobeet/Controller.pm というファイルが自動で作成されています。また昨日 end メソッドを追加しました。現在の内容は以下の用になっています。  
-(以前のバージョンのArkを使う場合、Controoler/Root.pm というコントローラーを定義して、そのnamespaceを空にすることで Rootコントローラを定義していましたが、今は、Controller.pmを定義することで同様の昨日の実現が可能になっています)
+lib/Jobeet/Controller.pm というファイルが自動で作成されています。また昨日 end メソッドを追加しました。現在の内容は以下の用になっています。
 
     package Jobeet::Controller;
     use Ark 'Controller';
-    
+
     # default 404 handler
     sub default :Path :Args {
         my ($self, $c) = @_;
-    
+
         $c->res->status(404);
         $c->res->body('404 Not Found');
     }
-    
+
     sub index :Path :Args(0) {
         my ($self, $c) = @_;
         $c->res->body('Ark Default Index');
     }
-    
+
     sub end :Private {
         my ($self, $c) = @_;
-    
+
         unless ($c->res->body or $c->res->status =~ /^3\d\d/) {
             $c->forward( $c->view('MT') );
         }
     }
-    
+
     1;
 
 Rootコントローラーのアクションはこれでいいでしょう。
@@ -368,15 +367,15 @@ Jobコントローラー
 
     package Jobeet::Controller::Job;
     use Ark 'Controller';
-    
+
     use Jobeet::Models;
-    
+
     sub index :Path {
         my ($self, $c) = @_;
-    
+
         $c->stash->{jobs} = models('Schema::Job');
     }
-    
+
     1;
 
 以下のように他のアクションも定義していきましょう。
@@ -414,7 +413,7 @@ Jobコントローラー
 
 ここまでできたら一度サーバーをデバッグモードで起動してみましょう。
 
-    $ plackup -r dev.psgi
+    $ carton exec plackup -r dev.psgi
 
 そうするとコンソールにルーティングのテーブルが表示されます。
 

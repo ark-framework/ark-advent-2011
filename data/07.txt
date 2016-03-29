@@ -15,7 +15,7 @@ DBIx::Class での 検索条件
 
     sub index :Path {
         my ($self, $c) = @_;
-    
+
         $c->stash->{jobs} = models('Schema::Job');
     }
 
@@ -26,7 +26,7 @@ DBIx::Class での 検索条件
 
     sub index :Path {
         my ($self, $c) = @_;
-    
+
         $c->stash->{jobs} = models('Schema::Job')->search({
             created_at => { '>=', models('Schema')->now->add( days => -30 ) },
         });
@@ -43,13 +43,13 @@ DBIx::Class で生成される SQL のデバッグ
 
 DBIx::Class が生成する SQL のデバッグ方法は実はすでに学んでいます。 DBIC_TRACE 環境変数を使用するのでした。
 
-    $ DBIC_TRACE=1 plackup dev.psgi
+    $ DBIC_TRACE=1 carton exec plackup dev.psgi
 
 とすることで DBIx::Class が実行している SQL ステートメントをコンソール（STDERR）に表示させることが出来ます。
 
 このような状態で /job/ にアクセスしてみてください。
 
-    SELECT me.id, me.category_id, me.type, me.company, me.logo, me.url, me.position, me.location, me.description, me.how_to_apply, me.token, me.is_public, me.is_activated, me.email, me.expires_at, me.created_at, me.updated_at FROM jobeet_job me WHERE ( created_at >= ? ): '2009-11-07T00:00:00'
+    SELECT me.id, me.category_id, me.type, me.company, me.logo, me.url, me.position, me.location, me.description, me.how_to_apply, me.token, me.is_public, me.is_activated, me.email, me.expires_at, me.created_at, me.updated_at FROM jobeet_job me WHERE ( created_at >= ? ): '2016-02-14T12:00:00'
 
 このような表示がされましたか？ さきほどの 30 日以内と言う条件がただしく入っているのがわかります。
 
@@ -72,11 +72,11 @@ DBIx::Class が生成する SQL のデバッグ方法は実はすでに学んで
 
 しかし job が作成されるとき、これを現在の日付の後の 30 日に自動的に設定できます。この方法はすでに学習しましたね。すでに `created_date` などが自動的に入るようなコードを書いています。Result クラスの insert メソッドを上書きすれば良かったのでしたね。
 
-今回は Job テーブルだけへの適用なので Jobeet::Schema::Result::Job に以下のメソッドを追加しましょう。
+今回は Job テーブルだけへの適用なので Jobeet::Schema::Result::Job に以下のメソッドを追加しましょう。 まず、クラスの冒頭に`use Jobeet::Models;` を追加しましょう｡
 
     sub insert {
         my $self = shift;
-    
+
         $self->expires_at( models('Schema')->now->add( days => 30 ) );
         $self->next::method(@_);
     }
@@ -88,7 +88,7 @@ DBIx::Class が生成する SQL のデバッグ方法は実はすでに学んで
 
     sub index :Path {
         my ($self, $c) = @_;
-    
+
         $c->stash->{jobs} = models('Schema::Job')->search({
             expires_at => { '>=', models('Schema')->now },
         });
@@ -104,13 +104,13 @@ DBIx::Class が生成する SQL のデバッグ方法は実はすでに学んで
     use strict;
     use warnings;
     use FindBin::libs;
-    
+
     use Jobeet::Models;
     use DateTime;
-    
+
     my $job_rs = models('Schema::Job');
     my $cat_rs = models('Schema::Category');
-    
+
     my $cat_programming = $cat_rs->find({ name => 'Programming' });
     my $job = $job_rs->create({
         category_id  => $cat_programming->id,
@@ -140,11 +140,11 @@ DBIx::Class が生成する SQL のデバッグ方法は実はすでに学んで
 設定ファイルを以下のように変更してみましょう。
 
     my $home = Jobeet::Models->get('home');
-    
+
     return {
         default_view    => 'MT',
         active_days     => 30,
-    
+
         database => [
             'dbi:SQLite:' . $home->file('database.db'), '', '',
              {
@@ -153,15 +153,13 @@ DBIx::Class が生成する SQL のデバッグ方法は実はすでに学んで
         ],
     };
 
-`active_days => 30,` と言う行を追加しました。この設定を使用するように `Jobeet::Schema::Result::Job` を変更していきましょう。まず、クラスの冒頭に
+`active_days => 30,` と言う行を追加しました。
 
-    use Jobeet::Models;
-
-と追加し、そして insert メソッドを以下のように修正します：
+そして insert メソッドを以下のように修正します：
 
     sub insert {
         my $self = shift;
-    
+
         $self->expires_at( models('Schema')->now->add( days => models('conf')->{active_days} ) );
         $self->next::method(@_);
     }
@@ -181,17 +179,17 @@ DBIx::Class が生成する SQL のデバッグ方法は実はすでに学んで
     use warnings;
     use utf8;
     use parent 'DBIx::Class::ResultSet';
-    
+
     use Jobeet::Models;
-    
+
     sub get_active_jobs {
         my $self = shift;
-    
+
         $self = $self->search({ expires_at => { '>=', models('Schema')->now }, });
-    
+
         $self;
     }
-    
+
     1;
 
 `Jobeet::Schema` で `load_namespaces` メソッドを呼ぶと `Jobeet::Schema::Result::*` と `Jobeet::Schema::ResultSet::*` ネームスペースのクラスを自動的に読むと言いました。つまりこの Jobeet::Schema::ResultSet::Job は `Result::Job` クラスの ResultSet として自動的にロードされます。
@@ -200,7 +198,7 @@ Job コントローラからはこのモデルを使用するようにしてみ�
 
     sub index :Path {
         my ($self, $c) = @_;
-    
+
         $c->stash->{jobs} = models('Schema::Job')->get_active_jobs;
     }
 
@@ -215,10 +213,10 @@ Job コントローラからはこのモデルを使用するようにしてみ�
 
     sub get_active_jobs {
         my $self = shift;
-    
+
         $self = $self->search({ expires_at => { '>=', models('Schema')->now }, });
         $self = $self->search({}, { order_by => { -desc => 'expires_at'} });
-    
+
         $self;
     }
 
@@ -239,16 +237,18 @@ ResultSet クラスの search メソッドの第一引数では検索条件 (WHE
     use strict;
     use warnings;
     use parent 'DBIx::Class::ResultSet';
-    
+
+    use Jobeet::Models;
+
     sub get_with_jobs {
         my $self = shift;
-    
+
         $self->search(
             { 'jobs.expires_at' => { '>=', models('Schema')->now } },
             { join => 'jobs', group_by => 'me.name' },
         );
     }
-    
+
     1;
 
 search の第二引数では join するリレーション名を指定できます。
@@ -258,19 +258,19 @@ Jobコントローラを以下のように、カテゴリをテンプレート�
 
     sub index :Path {
         my ($self, $c) = @_;
-    
+
         $c->stash->{categories} = models('Schema::Category')->get_with_jobs;
     }
 
 テンプレートでは、全てのカテゴリを渡すように反復し、利用可能な求人を表示する必要があります:
 
     ? extends 'common/base';
-    
+
     ? block stylesheets => sub {
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/main.css') ?>" />
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/jobs.css') ?>" />
     ? }
-    
+
     ? block content => sub {
     <div id="jobs">
     ? for my $category ($c->stash->{categories}->all) {
@@ -281,7 +281,7 @@ Jobコントローラを以下のように、カテゴリをテンプレート�
             </div>
             <h1><?= $category->name ?></h1>
           </div>
-     
+
           <table class="jobs">
     ? my $i = 0;
     ? for my $job ($category->get_active_jobs) {
@@ -302,14 +302,14 @@ Jobコントローラを以下のように、カテゴリをテンプレート�
     ? } #endfor $category
     </div>
     ? } #endblock content
-    
-    
+
+
 
 これを動かすには、カテゴリResultオブジェクト(Jobeet::Schema::Result::Category)にアクティブな求人を返す get_active_jobs メソッドを追加する必要があります:
 
     sub get_active_jobs {
         my $self = shift;
-    
+
         $self->jobs(
             { expires_at => { '>=', models('Schema')->now } },
             { order_by => { -desc => 'created_at' } }
@@ -330,9 +330,9 @@ Jobコントローラを以下のように、カテゴリをテンプレート�
     sub get_active_jobs {
         my $self = shift;
         my $attr = shift || {};
-    
+
         $attr->{rows} ||= 10;
-    
+
         $self->jobs(
             { expires_at => { '>=', models('Schema')->now } },
             {   order_by => { -desc => 'created_at' },
@@ -365,14 +365,14 @@ Jobコントローラを以下のように、カテゴリをテンプレート�
     use strict;
     use warnings;
     use FindBin::libs;
-    
+
     use Jobeet::Models;
-    
+
     my $job_rs = models('Schema::Job');
     my $cat_rs = models('Schema::Category');
-    
+
     my $cat_programming = $cat_rs->find({ name => 'Programming' });
-    
+
     for my $i (100 .. 130) {
         my $job = $job_rs->create({
             category_id  => $cat_programming->id,
@@ -410,4 +410,3 @@ Jobコントローラを以下のように、カテゴリをテンプレート�
 我々の実装と共に明日またお会いしましょう。
 
 Good luck!
-

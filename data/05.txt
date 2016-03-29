@@ -34,7 +34,7 @@ MVC パターンをはじめたばかりの初心者によくある間違いと�
 とりあえずテンプレートに対応する View を作成してみましょう。Ark ではデフォルトでいくつかのテンプレートエンジンに対応していますが、このチュートリアルでは Text::Microtemplate のビューを使用します。
 以下のコマンドを実行してください。
 
-    $ script/dev/skeleton.pl view MT
+    $ carton exec perl script/dev/skeleton.pl view MT
 
 これで Ark::View::MT を継承した Jobeet::View::MT クラスが自動的に作成されます。
 
@@ -46,7 +46,7 @@ MVC パターンをはじめたばかりの初心者によくある間違いと�
 
     sub end :Private {
         my ($self, $c) = @_;
-    
+
         unless ($c->res->body or $c->res->status =~ /^3\d\d/) {
             $c->forward( $c->view('MT') );
         }
@@ -75,7 +75,7 @@ Ark が提供するのはモデル自体ではなく Perl モジュールの入�
     use strict;
     use warnings;
     use Ark::Models '-base';
-    
+
     1;
 
 というような `use Ark::Models '-base';` を書いたクラスを一つ用意します。これがこのアプリケーションのモデルクラスとなります。ここに
@@ -132,11 +132,11 @@ Ark モデルではモデルを実際に使用するときに初めて初期化�
 
     register Schema => sub {
         my $self = shift;
-    
+
         my $conf = $self->get('conf')->{database};
         Jobeet::Schema->connect(@{ $conf });
     };
-    
+
     register 'Schema::Job' => sub {
         my $self = shift;
         $self->get('Schema')->resultset('Job');
@@ -147,9 +147,9 @@ Ark モデルではモデルを実際に使用するときに初めて初期化�
 
  * conf が初期化され（configがロードされ）
  * Schema が初期化され
- * その結果を用いて Schema::User が返る
+ * その結果を用いて Schema::Job が返る
 
-という処理で Schema::User のオブジェクトを取得することが出来ます。もちろんすでに初期化されたオブジェクトはキャッシュされるので初期化処理が何回も行われてしまうと言うことはありません。
+という処理で Schema::Job のオブジェクトを取得することが出来ます。もちろんすでに初期化されたオブジェクトはキャッシュされるので初期化処理が何回も行われてしまうと言うことはありません。
 
 Arkモデルを使用すると、このようにことで必要なものだけ初期化したり依存性のある複雑なモジュール間の連携を行うことができます。
 
@@ -180,16 +180,20 @@ Job 用のコントローラ（URL）を作成しましょう。ただし、ま�
 
     package Jobeet::Controller::Job;
     use Ark 'Controller';
-    
+
     use Jobeet::Models;
-    
+
     sub index :Path {
         my ($self, $c) = @_;
-    
+
         $c->stash->{jobs} = models('Schema::Job');
     }
-    
+
     1;
+
+先ほどViewを作成した時に使用したスケルトンを使用して作成/編集しても構いません｡
+
+    carton exec perl script/dev/skeleton.pl controller Job
 
 コントローラとURLのマッピング（ルーティング）は明日詳しく学習しますが、このコントローラの index 関数は `/job/` にリクエストが来たとき実行されます。
 そしてここでは `stash->{jobs}` に Job 一覧を格納しています。
@@ -211,9 +215,8 @@ stash とはグローバルな変数の入れ物であり、コントローラ�
 
 ベースとなるテンプレートを作成し、それを継承することで実際のページを作成します。以下のようなベーステンプレートを root/common/base.mt として定義しましょう。
 
-    <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-    <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <!DOCTYPE html>
+    <html lang="en">
       <head>
         <title>Jobeet - Your best job board</title>
         <link rel="shortcut icon" href="/favicon.ico" />
@@ -227,7 +230,7 @@ stash とはグローバルな変数の入れ物であり、コントローラ�
               <h1><a href="<?= $c->uri_for('/') ?>">
                 <img src="/images/logo.jpg" alt="Jobeet Job Board" />
               </a></h1>
-     
+
               <div id="sub_header">
                 <div class="post">
                   <h2>Ask for people</h2>
@@ -235,7 +238,7 @@ stash とはグローバルな変数の入れ物であり、コントローラ�
                     <a href="<?= $c->uri_for('/job/new') ?>">Post a Job</a>
                   </div>
                 </div>
-     
+
                 <div class="search">
                   <h2>Ask for a job</h2>
                   <form action="" method="get">
@@ -250,13 +253,13 @@ stash とはグローバルな変数の入れ物であり、コントローラ�
               </div>
             </div>
           </div>
-     
+
           <div id="content">
             <div class="content">
     ? block content => '';
             </div>
           </div>
-     
+
           <div id="footer">
             <div class="content">
               <span class="symfony">
@@ -290,12 +293,12 @@ stash とはグローバルな変数の入れ物であり、コントローラ�
 `root/job/index.mt` として以下のようなテンプレートを書いてみましょう
 
     ? extends 'common/base';
-    
+
     ? block stylesheets => sub {
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/main.css') ?>" />
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/jobs.css') ?>" />
     ? }
-    
+
     ? block content => sub {
     <div id="jobs">
       <table class="jobs">
@@ -315,8 +318,8 @@ stash とはグローバルな変数の入れ物であり、コントローラ�
     </table>
     </div>
     ? } # endblock content
-    
-    
+
+
 
 このテンプレートは `extends 'common/base'` で先ほど作成したベーステンプレートを継承し、そしてその後、stylesheets、content と言う二つのブロックを上書きしています。
 
@@ -324,7 +327,7 @@ content ブロックの中では先ほどコントローラからわたされた
 
 ここまででジョブの一覧ページはうまく動くはずです。以下のコマンドで開発サーバーを立ち上げて見てください。
 
-    $ plackup -r dev.psgi
+    $ carton exec plackup -r dev.psgi
 
 そしてブラウザーで `http://127.0.0.1:5000/job/` にアクセスしてみてください。
 
@@ -339,5 +342,3 @@ Jobの編集画面などは Ark のフォームクラスを学習した後実装
 
 本日は MVC パターンと、Ark におけるそれらの具体的な役割について学習しました。
 明日はコントローラとURLのマッピングについての詳細について学びます。
-
-

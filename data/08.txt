@@ -30,12 +30,12 @@ CPAN 経由でインストールしておいてください。
 
     package Jobeet::Controller::Category;
     use Ark 'Controller';
-    
+
     sub show :Path :Args(1) {
         my ($self, $c, $category_name) = @_;
-    
+
     }
-    
+
     1;
 
 slug カラムの追加
@@ -55,35 +55,38 @@ slug カラムの追加
 
 カラムを更新したので新しい DDL ファイルを作成しましょう。
 
-    $ perl ./script/dev/create_ddl.pl
+    $ carton exec perl ./script/dev/create_ddl.pl
 
 そしてここでデータベースもアップグレードと行きたいところですが、以下のコマンドを実行すると
 
-    $ perl ./script/dev/upgrade_database.pl
+    $ carton exec perl ./script/dev/migrate.pl
     ...
-    DBIx::Class::Schema::Versioned::upgrade(): DBI Exception: DBD::SQLite::db do failed: Cannot add a NOT NULL column with default value NULL [for Statement "ALTER TABLE jobeet_category ADD COLUMN slug VARCHAR(255) NOT NULL"]
+    BEGIN;
 
-のようなエラーになってしまいます。SQLite では NOT NULL のカラムを追加できないからです。
-また、もしここでエラーにならないデータベースエンジンでもユニークインデックスを追加するところでエラーになるでしょう。このような場合は通常通りデータベースを作りなおします。
+    ALTER TABLE jobeet_category ADD COLUMN slug VARCHAR(255);
 
-その前に slug カラムを Category テーブルが更新される度に自動的に更新されるようにしましょう。
+    CREATE UNIQUE INDEX jobeet_category_slug ON jobeet_category (slug);
+
+    COMMIT;
+
+slug カラムを Category テーブルが更新される度に自動的に更新されるようにしましょう。
 Jobeet::Schema::Result::Category にさらに次のメソッドを追加します。
 
     sub insert {
         my $self = shift;
-    
+
         $self->slug( decamelize $self->name );
-    
+
         $self->next::method(@_);
     }
-    
+
     sub update {
         my $self = shift;
-    
+
         if ($self->is_column_changed('name')) {
             $self->slug( decamelize $self->name );
         }
-    
+
         $self->next::method(@_);
     }
 
@@ -98,8 +101,8 @@ INSERT 時には常に name から slug を作成し、UPDATE 時には name が
 そして以下の手順でデータベースを更新しましょう。
 
     $ rm database.db
-    $ perl ./script/dev/upgrade_database.pl
-    $ perl ./script/dev/insert_default_data.pl
+    $ carton exec perl ./script/dev/migrate.pl
+    $ carton exec perl ./script/dev/insert_default_data.pl
 
 これで slug つきのデフォルトデータが作成されました。
 
@@ -109,17 +112,17 @@ INSERT 時には常に name から slug を作成し、UPDATE 時には name が
 リンクをカテゴリページに追加するために job モジュールの index.mt テンプレートを編集します:
 
     <!-- some HTML code -->
-    
+
             <h1>
               <a href="<?= $c->uri_for('/category', $category->slug) ?>">
                 <?= $category->name ?>
               </a>
             </h1>
-    
+
     <!-- some HTML code -->
-    
+
           </table>
-    
+
     ? my $count = $category->get_active_jobs->count;
     ? if ( (my $rest = $count - $max_rows) > 0 ) {
           <div class="more_jobs">
@@ -127,9 +130,9 @@ INSERT 時には常に name から slug を作成し、UPDATE 時には name が
             more...
           </div>
     ? } # endif
-    
+
         </div>
-    
+
     <!-- some HTML code -->
 
 現在のカテゴリで表示する求人件数が10を越える場合のみにリンクを表示します。リンクは表示されない求人件数を含みます。
@@ -139,7 +142,7 @@ INSERT 時には常に name から slug を作成し、UPDATE 時には name が
     sub get_active_jobs {
         my $self = shift;
         my $attr = shift || {};
-    
+
         $self->jobs(
             { expires_at => { '>=', models('Schema')->now } },
             {   order_by => { -desc => 'created_at' },
@@ -174,18 +177,18 @@ INSERT 時には常に name から slug を作成し、UPDATE 時には name が
 
     package Jobeet::Controller::Category;
     use Ark 'Controller';
-    
+
     use Jobeet::Models;
-    
+
     sub show :Path :Args(1) {
         my ($self, $c, $category_name) = @_;
-    
+
         my $category = models('Schema::Category')->find({ slug => $category_name })
             or $c->detach('/default');
-    
+
         $c->stash->{category} = $category;
     }
-    
+
     1;
 
 カテゴリテンプレート
@@ -194,24 +197,24 @@ INSERT 時には常に name から slug を作成し、UPDATE 時には name が
 つぎにテンプレートを設置しましょう。 root/category/show.mt として以下のようなテンプレートを作成しましょう。
 
     ? my $category = $c->stash->{category};
-    
+
     ? extends 'common/base';
-    
+
     ? block stylesheets => sub {
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/main.css') ?>" />
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/jobs.css') ?>" />
     ? }
-    
+
     ? block title => sub { sprintf 'Jobs in the %s category', $category->name };
-    
-    ? block content => sub { 
+
+    ? block content => sub {
     <div class="category">
       <div class="feed">
         <a href="">Feed</a>
       </div>
       <h1><?= $category->name ?></h1>
     </div>
-     
+
     <table class="jobs">
     ? my $i = 0;
     ? for my $job ($category->get_active_jobs) {
@@ -228,7 +231,7 @@ INSERT 時には常に name から slug を作成し、UPDATE 時には name が
         </tr>
     ? } # endfor $job
     </table>
-    
+
     ? } # endblock content
 
 
@@ -242,7 +245,7 @@ job の index.mt テンプレートから求人リストを作成する `<table>
 job/index.mt、category/show.mt はどちらも jobs.css を参照しています、この部分を共通化した jobs 用のベーステンプレートを作りましょう。root/common/jobs_base.mt という名前で以下のようにベーステンプレートを作ります：
 
     ? extends 'common/base';
-    
+
     ? block stylesheets => sub {
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/main.css') ?>" />
     <link rel="stylesheet" type="text/css" href="<?= $c->uri_for('/css/jobs.css') ?>" />
@@ -315,7 +318,7 @@ DBIx::Class でページオブジェクトを扱うには、`search` メソッ�
 
         $c->stash->{jobs} = $category->get_active_jobs({
             rows => models('conf')->{max_jobs_on_category},
-            page => $c->req->param('page') || 1,
+            page => $c->req->parameters->{page} || 1,
         });
 
 また Jobeet::Schema::Result::Category に page 属性をハンドリングできるよう修正しましょう：
@@ -323,7 +326,7 @@ DBIx::Class でページオブジェクトを扱うには、`search` メソッ�
     sub get_active_jobs {
         my $self = shift;
         my $attr = shift || {};
-    
+
         $self->jobs(
             { expires_at => { '>=', models('Schema')->now } },
             {   order_by => { -desc => 'created_at' },
@@ -354,27 +357,27 @@ rows と page 属性を与えられた ResultSet オブジェクトは pager メ
     ? my $category = $c->stash->{category};
     ? my $jobs     = $c->stash->{jobs};
     ? my $pager    = $jobs->pager;
-    
+
     ? extends 'common/jobs_base';
-    
+
     ? block title => sub { sprintf 'Jobs in the %s category', $category->name };
-    
-    ? block content => sub { 
+
+    ? block content => sub {
     <div class="category">
       <div class="feed">
         <a href="">Feed</a>
       </div>
       <h1><?= $category->name ?></h1>
     </div>
-    
-    ?= include('job/partial_jobs', $category->get_active_jobs);
-    
+
+    ?= include('job/_partial_jobs', $jobs->all);
+
     ? if ($pager->last_page > 1) {
       <div class="pagination">
         <a href="<?= $c->req->uri_with({ page => $pager->first_page }) ?>">
           <img src="/images/first.png" alt="First page" />
         </a>
-    
+
     ? if ($pager->previous_page) {
         <a href="<?= $c->req->uri_with({ page => $pager->previous_page }) ?>">
           <img src="/images/previous.png" alt="Previous page" title="Previous page" />
@@ -382,15 +385,15 @@ rows と page 属性を与えられた ResultSet オブジェクトは pager メ
     ? } else {
           <img src="/images/previous.png" alt="Previous page" title="Previous page" />
     ? }
-    
-    ? for my $p ($pager->pages_in_navigation) { 
+
+    ? for my $p ($pager->pages_in_navigation) {
     ?     if ($p == $pager->current_page) {
               <?= $p ?>
     ?     } else {
               <a href="<?= $c->req->uri_with({ page => $p }) ?>"><?= $p ?></a>
     ?     }
     ? }
-    
+
     ? if ($pager->next_page) {
         <a href="<?= $c->req->uri_with({ page => $pager->next_page }) ?>">
           <img src="/images/next.png" alt="Next page" title="Next page" />
@@ -398,23 +401,23 @@ rows と page 属性を与えられた ResultSet オブジェクトは pager メ
     ? } else {
           <img src="/images/next.png" alt="Next page" title="Next page" />
     ? }
-    
+
         <a href="<?= $c->req->uri_with({ page => $pager->last_page }) ?>">
           <img src="/images/last.png" alt="Last page" title="Last page" />
         </a>
       </div>
     ? } # endif
-    
+
     <div class="pagination_desc">
       <strong><?= $pager->total_entries ?></strong> jobs in this category
-    
+
     ? if ($pager->last_page > 1) {
         - page <strong><?= $pager->current_page ?>/<?= $pager->last_page ?></strong>
     ? }
     </div>
-    
+
     ? } # endblock content
-    
+
 たいていのコードでは他のページへのリンクが扱われます。このテンプレートで使われるページャメソッドのリストは次のとおりです:
 
     * first_page: 最初のページを返す
@@ -438,4 +441,3 @@ rows と page 属性を与えられた ResultSet オブジェクトは pager メ
 Ark の Web サイトに新しい機能を追加するプロセスは常に同じです: URLを考え、アクションを作り、モデルを更新し、テンプレートを書きます。そして、よい開発習慣を複数の事例に適用できるのであれば、早く Ark マスターになれます。
 
 明日はJobeetの新しい週の始まりです。祝うために、真新しいトピック: フォームを語ります。
-
